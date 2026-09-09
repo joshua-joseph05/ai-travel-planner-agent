@@ -198,6 +198,100 @@ def search_hotels(
     return formatted
 
 
+def search_places(
+    query: str,
+    *,
+    location: str | None = None,
+    limit: int = 5,
+) -> list[dict[str, Any]]:
+    """Search Google Maps places via SerpApi."""
+    q = f"{query} in {location}" if location else query
+    data = _search(
+        {
+            "engine": "google_maps",
+            "type": "search",
+            "q": q,
+            "hl": "en",
+        }
+    )
+
+    results = data.get("local_results") or []
+    # Some exact queries return a single place_results object instead
+    if not results and data.get("place_results"):
+        results = [data["place_results"]]
+
+    formatted: list[dict[str, Any]] = []
+    for place in results[:limit]:
+        gps = place.get("gps_coordinates") or {}
+        formatted.append(
+            {
+                "name": place.get("title") or place.get("name"),
+                "address": place.get("address"),
+                "rating": place.get("rating"),
+                "reviews": place.get("reviews"),
+                "type": place.get("type"),
+                "types": place.get("types") or place.get("type"),
+                "price": place.get("price"),
+                "open_state": place.get("open_state"),
+                "description": place.get("description"),
+                "place_id": place.get("place_id"),
+                "latitude": gps.get("latitude"),
+                "longitude": gps.get("longitude"),
+                "website": place.get("website"),
+                "phone": place.get("phone"),
+            }
+        )
+    return formatted
+
+
+def get_place_details(place_id: str) -> dict[str, Any]:
+    """Fetch details for one Google Maps place via SerpApi."""
+    data = _search(
+        {
+            "engine": "google_maps",
+            "type": "place",
+            "place_id": place_id,
+            "hl": "en",
+        }
+    )
+    place = data.get("place_results") or {}
+    gps = place.get("gps_coordinates") or {}
+    return {
+        "name": place.get("title") or place.get("name"),
+        "address": place.get("address"),
+        "rating": place.get("rating"),
+        "reviews": place.get("reviews"),
+        "type": place.get("type"),
+        "types": place.get("types") or place.get("type"),
+        "price": place.get("price"),
+        "open_state": place.get("open_state"),
+        "hours": place.get("hours"),
+        "description": place.get("description"),
+        "place_id": place.get("place_id") or place_id,
+        "latitude": gps.get("latitude"),
+        "longitude": gps.get("longitude"),
+        "website": place.get("website"),
+        "phone": place.get("phone"),
+        "extensions": place.get("extensions"),
+    }
+
+
+def format_place_results(options: list[dict[str, Any]]) -> str:
+    if not options:
+        return "No place results found."
+
+    lines = ["Top place options (live SerpApi Google Maps):"]
+    for i, opt in enumerate(options, start=1):
+        rating = opt.get("rating")
+        rating_text = f"{rating}/5" if rating is not None else "no rating"
+        lines.append(
+            f"{i}. {opt.get('name')} | {rating_text} | "
+            f"{opt.get('type') or opt.get('types') or 'place'} | "
+            f"{opt.get('address') or 'address n/a'}"
+        )
+    return "\n".join(lines)
+
+
 def format_flight_results(options: list[dict[str, Any]]) -> str:
     if not options:
         return "No flight results found for these dates/airports."
